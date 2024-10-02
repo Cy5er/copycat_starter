@@ -215,9 +215,12 @@ def main():
 
     # Set character pose to default: T-pose
     # Center the character root at the origin
-    root_translation = torch.zeros(3)
+    #root_translation = torch.zeros(3)
+    root_translation = torch.tensor([0.0,0.0,0.94]) # Y-pose
+    #root_translation = torch.tensor([0.0, 0.0, 0.6772]) #Upsidedown T-pose
     # Set global rotation as unit quaternion
     body_part_global_rotation = torch.zeros(24, 4)
+    #body_part_global_rotation[..., 0] = 1 Upsidedown T-pose
     body_part_global_rotation[..., -1] = 1
 
     # `poselib` has helpful classes called `SkeletonTree` and `SkeletonState` that handle forward kinematics
