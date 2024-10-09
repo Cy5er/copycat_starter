@@ -236,35 +236,7 @@ def main():
     root_translation = torch.zeros(3)
     body_part_global_rotation = torch.zeros(24, 4)
     body_part_global_rotation[..., -1] = 1
-    
-    #Upsidedown T-pose
-    #root_translation = torch.tensor([0.0, 0.0, 0.6772])
-    #body_part_global_rotation[..., 0] = 1 
-    
-    # Y-pose
-    # root_translation = torch.tensor([0.0,0.0,0.94])
-    
-    # body_part_global_rotation[L_Shoulder_idx] = torch.tensor([0.7, 0, 0, 0])
-    # body_part_global_rotation[L_Elbow_idx] = torch.tensor([0.7, 0, 0, 0])
-    # body_part_global_rotation[L_Wrist_idx] = torch.tensor([0.7, 0, 0, 0])
-    # body_part_global_rotation[L_Hand_idx] = torch.tensor([0.7, 0, 0, 0])
-    
-    # body_part_global_rotation[R_Shoulder_idx] = torch.tensor([-0.7, 0, 0, 0])
-    # body_part_global_rotation[R_Elbow_idx] = torch.tensor([-0.7, 0, 0, 0])
-    # body_part_global_rotation[R_Wrist_idx] = torch.tensor([-0.7, 0, 0, 0])
-    # body_part_global_rotation[R_Hand_idx] = torch.tensor([-0.7, 0, 0, 0])
-    # body_part_global_rotation[..., -1] = 1
-    
-    #Fetal postion
-    #root_translation = torch.tensor([0.0, 0.0, 0.26])
-    #body_part_global_rotation[Spine_idx] = torch.tensor([1, 1, 1, 1])
-    #body_part_global_rotation[R_Hip_idx] = torch.tensor([1, 0, -1, 0])
-    #body_part_global_rotation[L_Hip_idx] = torch.tensor([1, 0, -1, 0])
-    
-    #body_part_global_rotation[R_Shoulder_idx] = torch.tensor([1, -1, 0, 0])
-    #body_part_global_rotation[R_Elbow_idx] = torch.tensor([1, -1, -1, -1])
-    #body_part_global_rotation[L_Shoulder_idx] = torch.tensor([0.7, 0, 0, 0])
-    #body_part_global_rotation[..., 0] = 1
+
 
     # `poselib` has helpful classes called `SkeletonTree` and `SkeletonState` that handle forward kinematics
     sk_tree = SkeletonTree.from_mjcf(MJCF_PATH)
