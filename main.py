@@ -212,24 +212,6 @@ def main():
     pl.add_mesh(floor, show_edges=True, pbr=True, roughness=0.24, metallic=0.1)
     sk_actors = add_skel_meshes(pl, skels)  # multiple actors are returned
     ax_actors = add_axes_meshes(pl, axes)  # multiple actors are returned
-    
-    L_Shoulder_idx = body_names.index("L_Shoulder")
-    R_Shoulder_idx = body_names.index("R_Shoulder")
-    L_Elbow_idx = body_names.index("L_Elbow")
-    R_Elbow_idx = body_names.index("R_Elbow")
-    L_Hand_idx = body_names.index("L_Hand")
-    R_Hand_idx = body_names.index("R_Hand")
-    L_Wrist_idx = body_names.index("L_Wrist")
-    R_Wrist_idx = body_names.index("R_Wrist")
-    Spine_idx = body_names.index("Spine")
-    Chest_idx = body_names.index("Chest")
-    Neck_idx = body_names.index("Neck")
-    L_Hip_idx = body_names.index("L_Hip")
-    R_Hip_idx = body_names.index("R_Hip")
-    L_Knee_idx = body_names.index("L_Knee")
-    R_Knee_idx = body_names.index("R_Knee")
-    L_Ankle_idx = body_names.index("L_Ankle")
-    R_Ankle_idx = body_names.index("R_Ankle")
 
     # Set character pose to default: T-pose
     # Center the character root at the origin
