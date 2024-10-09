@@ -12,66 +12,33 @@ COPYCAT_PATH = "data/amass_copycat_take5_train_medium.pkl"
 
 
 class AppState:
-    def __init__(self, skel_state: SkeletonState, skel_actors, axes_actors):
+    def __init__(self, skel_tree: SkeletonTree, skel_state: SkeletonState, skel_actors, axes_actors):
         """
         Initializes the application state.
-        The application state is a canonical way to use the immediate mode GUI.
-        Whatever change made to the GUI will probably require a change in the application state definition.
-
-        Args:
-            skel_state (SkeletonState): The state of the skeleton.
-            skel_actors: List of actors representing the skeleton.
-            axes_actors: List of actors representing the axes.
         """
+        self.skel_tree = skel_tree
         self.skel_state = skel_state
         self.skel_actors = skel_actors
         self.axes_actors = axes_actors
         self.mocap_file = COPYCAT_PATH
-        self.mocap_dict = {"Default": []}
+        self.mocap_dict = {"Default": []}  # Default mocap data dict, will load actual mocap below
         self.mocap_idx = 0
-
         self.frame_idx = 0
         self.is_playing = False
         self.show_axes = False
+        self.mocap_length = 0  # Track the total frames for the mocap
+        self.last_frame_time = time.time()  # To track time for FPS control
 
-
-# You may want to use these body names to get the index of the body part in the skeleton state.
-body_names = [
-    "Pelvis",
-    "L_Hip",
-    "L_Knee",
-    "L_Ankle",
-    "L_Toe",
-    "R_Hip",
-    "R_Knee",
-    "R_Ankle",
-    "R_Toe",
-    "Torso",
-    "Spine",
-    "Chest",
-    "Neck",
-    "Head",
-    "L_Thorax",
-    "L_Shoulder",
-    "L_Elbow",
-    "L_Wrist",
-    "L_Hand",
-    "R_Thorax",
-    "R_Shoulder",
-    "R_Elbow",
-    "R_Wrist",
-    "R_Hand",
-]
+    def load_mocap_data(self):
+        """Load mocap data from the specified file and update the dictionary."""
+        self.mocap_dict = joblib.load(self.mocap_file)
+        mocap_name = list(self.mocap_dict.keys())[self.mocap_idx]
+        self.mocap_length = self.mocap_dict[mocap_name]['trans_orig'].shape[0]  # Update total frame count
 
 
 def setup_and_run_gui(pl: ImguiPlotter, app_state: AppState):
     """
     Sets up and runs the GUI for the application.
-    You will want to observe the patterns of immediate mode GUI programming to understand how the GUI is set up.
-
-    Args:
-        pl (ImguiPlotter): The ImGui plotter instance used for rendering.
-        app_state (AppState): The state of the application including skeleton, axes, and mocap data.
     """
     # Initialize window properties
     runner_params = hello_imgui.RunnerParams()
@@ -125,9 +92,9 @@ def setup_and_run_gui(pl: ImguiPlotter, app_state: AppState):
             "MocapIdx", app_state.mocap_idx, 0, len(app_state.mocap_dict) - 1
         )
         if changed:
-            app_state.frame_idx = (
-                0  # Reset frame index when a new mocap file is selected
-            )
+            app_state.frame_idx = 0  # Reset frame index when a new mocap file is selected
+            app_state.load_mocap_data()
+
         app_state.mocap_name = list(app_state.mocap_dict.keys())[app_state.mocap_idx]
 
         # Display mocap name (read-only)
@@ -146,9 +113,7 @@ def setup_and_run_gui(pl: ImguiPlotter, app_state: AppState):
 
         # Playback controls (Play, Pause, Stop)
         if imgui.button("Play"):
-            app_state.is_playing = (
-                True  # Set playing state to True when Play is clicked
-            )
+            app_state.is_playing = True  # Set playing state to True when Play is clicked
         imgui.same_line()
         if imgui.button("Pause"):
             app_state.is_playing = False  # Pause playback
@@ -158,28 +123,29 @@ def setup_and_run_gui(pl: ImguiPlotter, app_state: AppState):
             app_state.frame_idx = 0
 
         # Automatic frame advancement when playing
-        if app_state.is_playing:
+        current_time = time.time()
+        if app_state.is_playing and current_time - app_state.last_frame_time >= 1 / target_fps:
             app_state.frame_idx += 1
-            app_state.frame_idx %= (
-                mocap_length  # Loop frame index within the mocap length
-            )
+            app_state.frame_idx %= mocap_length  # Loop frame index within the mocap length
+            app_state.last_frame_time = current_time  # Update the last frame time
 
         # Toggle visibility of axes in the scene
         changed, app_state.show_axes = imgui.checkbox("Show Axes", app_state.show_axes)
         imgui.end()
 
-        # Set skeleton pose based on the mocap data at the current frame
-        set_skel_pose(
-            app_state.skel_state,
-            app_state.skel_actors,
-            app_state.axes_actors,
-            app_state.show_axes,
+        # Apply mocap data to skeleton pose
+        translation = torch.as_tensor(mocap["trans_orig"][app_state.frame_idx])
+        rotation = torch.as_tensor(mocap["pose_quat_global"][app_state.frame_idx])
+
+        # Use the skel_tree from app_state instead of app_state.skel_state.tree
+        app_state.skel_state = SkeletonState.from_rotation_and_root_translation(
+            app_state.skel_tree, rotation, translation, is_local=False
         )
 
-        # Sleep to maintain the target frame rate
-        time_to_sleep = (1 / target_fps) - imgui_io.delta_time
-        if time_to_sleep > 0:
-            time.sleep(time_to_sleep)
+        # Apply the pose to the skeleton actors
+        set_skel_pose(
+            app_state.skel_state, app_state.skel_actors, app_state.axes_actors, app_state.show_axes
+        )
 
     # Configure GUI behavior
     runner_params.callbacks.show_gui = gui
@@ -193,45 +159,37 @@ def setup_and_run_gui(pl: ImguiPlotter, app_state: AppState):
 
 def main():
     # Initialize PyVista plotter and set a few parameters
-    # Feel free to adjust these to your needs.
     pl = ImguiPlotter()
     pl.enable_shadows()  # Enable shadows for the 3D scene
     pl.add_axes()  # Add default axes for the scene
-    # Set camera position, focus, and orientation
     pl.camera.position = (-5, -5, 2)
     pl.camera.focal_point = (0, 0, 0)
     pl.camera.up = (0, 0, 1)
 
-    # PyVista works with meshes (intended to be static 3D data) and actors (manipulable objects corresponding to meshes)
     # Load skeleton and axes meshes from the MJCF file
     floor = pv.Plane(i_size=10, j_size=10)  # Create a floor plane
     skels = load_skel(MJCF_PATH)  # Load skeleton meshes
     axes = load_axes(MJCF_PATH)  # Load axes meshes
 
-    # We have created meshes. Now we "add" them to the plotter via `.add_mesh()` to get actors
+    # Add floor and skeleton meshes to the plotter
     pl.add_mesh(floor, show_edges=True, pbr=True, roughness=0.24, metallic=0.1)
-    sk_actors = add_skel_meshes(pl, skels)  # multiple actors are returned
-    ax_actors = add_axes_meshes(pl, axes)  # multiple actors are returned
+    sk_actors = add_skel_meshes(pl, skels)  # Add skeleton actors
+    ax_actors = add_axes_meshes(pl, axes)  # Add axes actors
 
-    # Set character pose to default: T-pose
-    # Center the character root at the origin
+    # Initialize the skeleton to the T-pose
     root_translation = torch.zeros(3)
     body_part_global_rotation = torch.zeros(24, 4)
     body_part_global_rotation[..., -1] = 1
-
-
-    # `poselib` has helpful classes called `SkeletonTree` and `SkeletonState` that handle forward kinematics
     sk_tree = SkeletonTree.from_mjcf(MJCF_PATH)
     sk_state = SkeletonState.from_rotation_and_root_translation(
         sk_tree, body_part_global_rotation, root_translation, is_local=False
     )
-    set_skel_pose(
-        sk_state, sk_actors, ax_actors, show_axes=True
-    )  # Sets the pose of each individual actor.
+
+    # Initialize the app state with the skeleton actors and load mocap data
+    app_state = AppState(sk_tree, sk_state, sk_actors, ax_actors)
+    app_state.load_mocap_data()
 
     # Run the GUI
-    app_state = AppState(sk_state, sk_actors, ax_actors)
-    app_state.mocap_dict = joblib.load(app_state.mocap_file)
     setup_and_run_gui(pl, app_state)
 
 
